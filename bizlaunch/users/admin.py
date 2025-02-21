@@ -1,24 +1,17 @@
-from django.conf import settings
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
-from django.urls import reverse
-from django.utils.html import format_html
 from django.utils.translation import gettext_lazy as _
 
-
 User = get_user_model()
-
 
 
 @admin.register(User)
 class UserAdmin(BaseUserAdmin):
     list_display = (
         "uuid",
-        "first_name",
-        "last_name",
+        "name",
         "email",
-        "role",
         "is_superuser",
         "is_staff",
         "is_active",
@@ -37,12 +30,9 @@ class UserAdmin(BaseUserAdmin):
         (
             _("Personal info"),
             {
-                "fields": (
-                    "first_name",
-                    "last_name",
-                    # "profile_image",
-                    "role",
-                )
+                "fields": [
+                    "name",
+                ],
             },
         ),
         (
@@ -70,8 +60,7 @@ class UserAdmin(BaseUserAdmin):
                 "classes": ("wide",),
                 "fields": (
                     "email",
-                    "first_name",
-                    "last_name",
+                    "name",
                     "password1",
                     "password2",
                 ),

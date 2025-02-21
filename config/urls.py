@@ -1,5 +1,5 @@
 """
-URL configuration for grid project.
+URL configuration for bizlaunch project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/4.2/topics/http/urls/
@@ -20,20 +20,20 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponse
 from django.shortcuts import render
-from django.urls import include, path
+from django.urls import include
+from django.urls import path
 from django.views import defaults as default_views
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
-from rest_framework.routers import DefaultRouter
 
 schema_view = get_schema_view(
     openapi.Info(
-        title="HireGrid API",
+        title="Bizlaunch API",
         default_version="v1",
-        description="API documentation for HireGrid",
+        description="API documentation for Bizlaunch",
         terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@hiregrid.local"),
+        contact=openapi.Contact(email="contact@example.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
@@ -54,15 +54,17 @@ urlpatterns = [
     path("health/", home, name="home"),
     path("test/", test, name="test"),
     path(
-        "swagger<format>/", schema_view.without_ui(cache_timeout=0), name="schema-json"
+        "swagger<format>/",
+        schema_view.without_ui(cache_timeout=0),
+        name="schema-json",
     ),
     path(
-        "swagger/",
+        "docs/",
         schema_view.with_ui("swagger", cache_timeout=0),
         name="schema-swagger-ui",
     ),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
-    # path("api/auth/", include("grid.users.urls"), name="user-auth"),
+    path("api/auth/", include("bizlaunch.users.urls"), name="user-auth"),
 ]
 
 

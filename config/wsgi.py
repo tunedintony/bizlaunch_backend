@@ -1,5 +1,5 @@
 """
-WSGI config for grid project.
+WSGI config for bizlaunch project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 

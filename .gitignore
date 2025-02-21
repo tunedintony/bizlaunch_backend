@@ -274,3 +274,4 @@ bizlaunch/media/
 .pytest_cache/
 
 .env
+db.sqlite3
