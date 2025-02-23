@@ -312,11 +312,11 @@ BASE_URL = config(
     "BASE_URL",
     "http://localhost:8000",
 )  # Default to localhost if not set
-FRONT_BASE_URL = config("FRONT_BASE_URL", "http://localhost:3000")
+FRONTEND_BASE_URL = config("FRONT_BASE_URL", "http://localhost:3000")
 # Derived URLs
 API_BASE_URL = f"{BASE_URL}/api"
-EMAIL_CONFIRM_REDIRECT_BASE_URL = f"{FRONT_BASE_URL}/email/confirm/"
-PASSWORD_RESET_CONFIRM_REDIRECT_BASE_URL = f"{FRONT_BASE_URL}/password-reset/confirm/"
+EMAIL_CONFIRM_REDIRECT_BASE_URL = f"{FRONTEND_BASE_URL}/email/confirm/"
+PASSWORD_RESET_CONFIRM_REDIRECT_BASE_URL = f"{FRONTEND_BASE_URL}/password-reset/confirm/"
 
 
 # ADMIN
@@ -357,6 +357,7 @@ REST_AUTH = {
 
 # SimpleJWT Settings
 SIMPLE_JWT = {
+    "TOKEN_OBTAIN_SERIALIZER": "bizlaunch.users.serializers.CustomTokenObtainPairSerializer",
     "USER_ID_FIELD": "email",
     "AUTH_HEADER_TYPES": ("Bearer",),
     "UPDATE_LAST_LOGIN": True,

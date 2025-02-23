@@ -1,17 +1,31 @@
-from dj_rest_auth.registration.views import RegisterView
-from dj_rest_auth.registration.views import ResendEmailVerificationView
-from dj_rest_auth.registration.views import VerifyEmailView
-from dj_rest_auth.views import PasswordResetConfirmView
-from dj_rest_auth.views import PasswordResetView
-from dj_rest_auth.views import UserDetailsView
-from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView
-from rest_framework_simplejwt.views import TokenRefreshView
+from dj_rest_auth.registration.views import (
+    RegisterView,
+    ResendEmailVerificationView,
+    VerifyEmailView,
+)
+from dj_rest_auth.views import (
+    PasswordResetConfirmView,
+    PasswordResetView,
+    UserDetailsView,
+)
+from django.urls import path, include
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from bizlaunch.users.views import email_confirm_redirect
-from bizlaunch.users.views import password_reset_confirm_redirect
+from bizlaunch.users.views import (
+    ProfileView,
+    email_confirm_redirect,
+    password_reset_confirm_redirect,
+    TeamViewSet,
+    MemberRegisterView
+)
+
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register("team", TeamViewSet, basename="team")
 
 urlpatterns = [
+    path("", include(router.urls)),
     path("token/", TokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
     path("register/", RegisterView.as_view(), name="rest_register"),
@@ -43,4 +57,6 @@ urlpatterns = [
         PasswordResetConfirmView.as_view(),
         name="password_reset_confirm",
     ),
+    path("profile/", ProfileView.as_view(), name="profile"),
+    path("member-register/", MemberRegisterView.as_view(), name="member-register"),
 ]
