@@ -8,8 +8,19 @@ from django.utils.translation import gettext_lazy as _
 from rest_framework import serializers
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.token_blacklist.models import (
+    BlacklistedToken,
+    OutstandingToken,
+)
 
-from bizlaunch.users.models import InviteStatus, Profile, Team, TeamInvite, TeamMember
+from bizlaunch.users.models import (
+    InviteStatus,
+    Profile,
+    Team,
+    TeamInvite,
+    TeamMember,
+    UserRole,
+)
 from bizlaunch.users.tasks import send_invite_email, send_joined_email
 
 User = get_user_model()
@@ -37,6 +48,20 @@ class ChangePasswordSerializer(serializers.Serializer):
         user = self.context["request"].user
         user.set_password(self.validated_data["new_password1"])
         user.save()
+
+        # Blacklist all outstanding tokens for the user
+        tokens = OutstandingToken.objects.filter(user=user)
+        for token in tokens:
+            try:
+                # Blacklist the token
+                BlacklistedToken.objects.get_or_create(token=token)
+            except Exception as e:
+                raise serializers.ValidationError(
+                    {
+                        "detail": f"An error occurred while blacklisting the token: {str(e)}"
+                    }
+                )
+
         return user
 
 
@@ -53,17 +78,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return data
 
 
-class UserDetailsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = (
-            "uuid",
-            "email",
-            "created_at",
-            "updated_at",
-            "last_login",
-        )
-        read_only_fields = ("email", "created_at", "updated_at", "last_login")
+# class UserDetailsSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = User
+#         fields = (
+#             "uuid",
+#             "email",
+#             "created_at",
+#             "updated_at",
+#             "last_login",
+#         )
+#         read_only_fields = ("email", "created_at", "updated_at", "last_login")
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -75,10 +100,32 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class TeamSerializer(serializers.ModelSerializer):
     owner = serializers.StringRelatedField(read_only=True)
+    members = serializers.SerializerMethodField()
+    invites = serializers.SerializerMethodField()
 
     class Meta:
         model = Team
-        fields = ["uuid", "name", "owner", "created_at", "updated_at"]
+        fields = [
+            "uuid",
+            "name",
+            "owner",
+            "members",
+            "invites",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_members(self, obj):
+        # Fetch all accepted members of the team
+        accepted_members = TeamMember.objects.filter(team=obj)
+        return TeamMemberSerializer(accepted_members, many=True).data
+
+    def get_invites(self, obj):
+        # Fetch all pending invites for the team
+        pending_invites = TeamInvite.objects.filter(
+            team=obj, status=InviteStatus.PENDING
+        )
+        return TeamInviteSerializer(pending_invites, many=True).data
 
 
 class TeamMemberSerializer(serializers.ModelSerializer):
@@ -97,6 +144,7 @@ class TeamInviteSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamInvite
         fields = [
+            "uuid",
             "email",
             "team",
             "status",
@@ -122,14 +170,14 @@ class TeamInviteSerializer(serializers.ModelSerializer):
         return email
 
     def validate(self, data):
-        # Ensure the team is provided in the request data
-        team = (
-            self.context["request"].user.owned_team
-            if hasattr(self.context["request"].user, "owned_team")
-            else None
-        )
+        # Ensure the team exists, create one if it doesn't
+        user = self.context["request"].user
+        team = getattr(user, "owned_team", None)
         if not team:
-            raise serializers.ValidationError("You do not own a team to send invites.")
+            if user.role == UserRole.ADMIN:
+                team = Team.objects.create(owner=user, name=f"{user.name}'s Team")
+            else:
+                raise serializers.ValidationError("You are not authorized to own a team.")
         data["team"] = team
         return data
 
@@ -138,14 +186,18 @@ class TeamInviteSerializer(serializers.ModelSerializer):
         team = inviter.owned_team
 
         # Check for existing invite with PENDING or EXPIRED status
-        existing_invite = TeamInvite.objects.filter(
-            email=validated_data["email"], team=team
-        ).filter(status__in=[InviteStatus.PENDING, InviteStatus.EXPIRED]).first()
+        existing_invite = (
+            TeamInvite.objects.filter(email=validated_data["email"], team=team)
+            .filter(status__in=[InviteStatus.PENDING, InviteStatus.EXPIRED])
+            .first()
+        )
 
         if existing_invite:
             # Update the expiration date and resend the invite
             existing_invite.expires_at = timezone.now() + timezone.timedelta(days=7)
-            existing_invite.status = InviteStatus.PENDING  # Reset status to PENDING if it was EXPIRED
+            existing_invite.status = (
+                InviteStatus.PENDING
+            )  # Reset status to PENDING if it was EXPIRED
             existing_invite.save(update_fields=["expires_at", "status", "updated_at"])
 
             # Resend the invitation email
@@ -196,14 +248,19 @@ class MemberRegisterSerializer(serializers.Serializer):
                 # Retrieve the invite from the context instead of querying again
                 invite = self.context.get("invite")
                 if not invite:
-                    raise serializers.ValidationError("Invalid or expired invitation token.")
+                    raise serializers.ValidationError(
+                        "Invalid or expired invitation token."
+                    )
 
-                # Create the user
-                email_prefix = invite.email.split("@")[0]  # Extract the first part of the email
+                # Create the user with role MEMBER
+                email_prefix = invite.email.split("@")[
+                    0
+                ]  # Extract the first part of the email
                 user = User.objects.create(
                     email=invite.email,
                     is_active=True,
                     name=email_prefix,  # Use the email prefix as the username
+                    role=UserRole.MEMBER,  # Set the role to MEMBER
                 )
                 user.set_password(password)
                 user.save()
@@ -213,8 +270,9 @@ class MemberRegisterSerializer(serializers.Serializer):
                     user=user, email=user.email, verified=True, primary=True
                 )
 
-                # Add the user to the team
-                TeamMember.objects.create(team=invite.team, user=user)
+                # Add the user to the team and update the team's members
+                team_member = TeamMember.objects.create(team=invite.team, user=user)
+                invite.team.team_members.add(team_member)
 
                 # Mark the invite as accepted
                 invite.status = InviteStatus.ACCEPTED
@@ -229,3 +287,41 @@ class MemberRegisterSerializer(serializers.Serializer):
 
             traceback.print_exc()
             raise e
+
+
+class UserProfileSerializerForDetail(serializers.ModelSerializer):
+    class Meta:
+        model = Profile
+        fields = ["bio", "profile_picture"]
+
+
+class UserTeamSerializerForDetail(serializers.ModelSerializer):
+    class Meta:
+        model = Team
+        fields = ["uuid", "name"]
+
+
+class UserDetailsSerializer(serializers.ModelSerializer):
+    team = serializers.SerializerMethodField()
+    profile = UserProfileSerializerForDetail()
+
+    class Meta:
+        model = User
+        fields = [
+            "uuid",
+            "name",
+            "email",
+            "role",
+            "team",
+            "profile",
+            "created_at",
+            "updated_at",
+            "last_login",
+        ]
+
+    def get_team(self, obj):
+        # Fetch the user's team (if any)
+        team = Team.objects.filter(owner=obj).first()
+        if team:
+            return UserTeamSerializerForDetail(team).data
+        return None

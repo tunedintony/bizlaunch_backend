@@ -8,18 +8,18 @@ from dj_rest_auth.views import (
     PasswordResetView,
     UserDetailsView,
 )
-from django.urls import path, include
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
 from bizlaunch.users.views import (
+    ChangePasswordView,
+    MemberRegisterView,
     ProfileView,
+    TeamViewSet,
     email_confirm_redirect,
     password_reset_confirm_redirect,
-    TeamViewSet,
-    MemberRegisterView
 )
-
-from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
 router.register("team", TeamViewSet, basename="team")
@@ -59,4 +59,5 @@ urlpatterns = [
     ),
     path("profile/", ProfileView.as_view(), name="profile"),
     path("member-register/", MemberRegisterView.as_view(), name="member-register"),
+    path("change-password/", ChangePasswordView.as_view(), name="change-password"),
 ]

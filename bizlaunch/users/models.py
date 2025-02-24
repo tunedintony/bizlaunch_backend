@@ -19,11 +19,18 @@ def get_profile_picture_path(instance, filename):
     return os.path.join(f"{instance.user.uuid}/profile", filename)
 
 
+class UserRole(models.TextChoices):
+    ADMIN = "admin", "Admin"
+    MEMBER = "member", "Member"
+
+
 class User(AbstractUser, CoreModel):
     username = None
     email = models.EmailField(_("email address"), unique=True)
-    # First and last name do not cover name patterns around the globe
     name = models.CharField(_("Name of User"), blank=True, max_length=255)
+    role = models.CharField(
+        max_length=10, choices=UserRole.choices, default=UserRole.ADMIN
+    )
     first_name = None  # type: ignore[assignment]
     last_name = None  # type: ignore[assignment]
 
@@ -31,6 +38,14 @@ class User(AbstractUser, CoreModel):
     REQUIRED_FIELDS = []
 
     objects = CustomUserManager()
+
+    @property
+    def is_team_owner(self):
+        return hasattr(self, "owned_team")
+
+    @property
+    def is_team_member(self):
+        return self.role == self.MEMBER
 
     def __str__(self):
         return self.email
@@ -73,7 +88,7 @@ class TeamMember(CoreModel):
     )
 
     def __str__(self):
-        return f"{self.user.email} in {self.team.name}"
+        return f"{self.user.email} in {self.team.name} as {self.role}"
 
 
 class InviteStatus(models.TextChoices):

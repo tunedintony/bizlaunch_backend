@@ -1,8 +1,6 @@
 # ruff: noqa: E501
 from .base import *  # noqa: F403
-from .base import INSTALLED_APPS
-from .base import MIDDLEWARE
-from .base import config
+from .base import INSTALLED_APPS, MIDDLEWARE, config
 
 # GENERAL
 # ------------------------------------------------------------------------------
@@ -29,9 +27,16 @@ CACHES = {
 # EMAIL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#email-backend
-EMAIL_BACKEND = config(
-    "DJANGO_EMAIL_BACKEND", default="django.core.mail.backends.console.EmailBackend",
-)
+USE_SMTP = config("USE_SMTP", default=False, cast=bool)
+if USE_SMTP:
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = config("EMAIL_HOST", default="localhost")
+    EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+    EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
+    EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
+    EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="", cast=str)
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # WhiteNoise
 # ------------------------------------------------------------------------------

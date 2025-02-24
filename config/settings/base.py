@@ -14,8 +14,7 @@ import os
 from datetime import timedelta
 from pathlib import Path
 
-from decouple import Csv
-from decouple import config
+from decouple import Csv, config
 
 # Set the project base directory
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -50,6 +49,7 @@ THIRD_PARTY_APPS = [
     "drf_yasg",
     "corsheaders",
     "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "django.contrib.sites",
     "allauth",
     "allauth.account",
@@ -143,7 +143,7 @@ AUTH_PASSWORD_VALIDATORS = [
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "dj_rest_auth.jwt_auth.JWTCookieAuthentication",  # Required by dj-rest-auth for JWT cookies
-        "rest_framework_simplejwt.authentication.JWTAuthentication",  # SimpleJWT for token authentication
+        "bizlaunch.users.authentication.CustomJWTAuthentication",  # SimpleJWT for token authentication
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",  # Default permission for authenticated access
@@ -265,9 +265,9 @@ CORS_URLS_REGEX = r"^/api/.*$"
 CORS_ALLOW_ALL_ORIGINS = True
 
 
-REST_AUTH_SERIALIZERS = {
-    "PASSWORD_RESET_SERIALIZER": "bizlaunch.users.serializers.PasswordResetSerializer",
-}
+# REST_AUTH_SERIALIZERS = {
+#     "PASSWORD_RESET_SERIALIZER": "bizlaunch.users.serializers.PasswordResetSerializer",
+# }
 
 # drf-yasg------------------------------------------------------
 SWAGGER_SETTINGS = {
@@ -316,7 +316,9 @@ FRONTEND_BASE_URL = config("FRONT_BASE_URL", "http://localhost:3000")
 # Derived URLs
 API_BASE_URL = f"{BASE_URL}/api"
 EMAIL_CONFIRM_REDIRECT_BASE_URL = f"{FRONTEND_BASE_URL}/email/confirm/"
-PASSWORD_RESET_CONFIRM_REDIRECT_BASE_URL = f"{FRONTEND_BASE_URL}/password-reset/confirm/"
+PASSWORD_RESET_CONFIRM_REDIRECT_BASE_URL = (
+    f"{FRONTEND_BASE_URL}/password-reset/confirm/"
+)
 
 
 # ADMIN
@@ -353,6 +355,7 @@ REST_AUTH = {
     "USE_JWT": True,
     "JWT_AUTH_COOKIE": "bizlaunch-auth",
     "JWT_AUTH_REFRESH_COOKIE": "bizlaunch-refresh-token",
+    "USER_DETAILS_SERIALIZER": "bizlaunch.users.serializers.UserDetailsSerializer",
 }
 
 # SimpleJWT Settings
@@ -363,6 +366,10 @@ SIMPLE_JWT = {
     "UPDATE_LAST_LOGIN": True,
     "ACCESS_TOKEN_LIFETIME": timedelta(days=7),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
 }
 
 
