@@ -3,9 +3,9 @@ import secrets
 
 from django.contrib.auth.models import AbstractUser
 from django.db import models
-from django.utils import timezone
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from bizlaunch.core.models import CoreModel
@@ -69,7 +69,7 @@ class Profile(CoreModel):
 
 
 class Team(CoreModel):
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     owner = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="owned_team"
     )
