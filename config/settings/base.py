@@ -22,11 +22,7 @@ APPS_DIR = BASE_DIR / "bizlaunch"
 
 SECRET_KEY = config("DJANGO_SECRET_KEY")
 
-ALLOWED_HOSTS = config(
-    "DJANGO_ALLOWED_HOSTS",
-    default="127.0.0.1,localhost,localhost:8000",
-    cast=Csv(),
-)
+ALLOWED_HOSTS = ["*"]
 
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
 DEBUG = config("DJANGO_DEBUG", default=False, cast=bool)
