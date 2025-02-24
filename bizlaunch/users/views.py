@@ -100,11 +100,18 @@ class TeamViewSet(viewsets.ViewSet):
     def get_queryset(self):
         return Team.objects.filter(owner=self.request.user)
 
+    @action(
+        detail=False,
+        methods=["get"],
+        url_path="my-team",
+        url_name="my_team",
+        permission_classes=[IsAuthenticated],
+    )
     @swagger_auto_schema(
         operation_description="Retrieve the authenticated user's team. If no team exists, one will be created automatically. The response includes team details, pending invites, and accepted members.",
         responses={status.HTTP_200_OK: TeamSerializer},
     )
-    def get(self, request):
+    def my_team(self, request):
         # Check if the user owns a team
         team = self.get_queryset().first()
         if not team:
@@ -139,23 +146,23 @@ class TeamViewSet(viewsets.ViewSet):
         serializer.save()
         return Response(serializer.data)
 
-    @action(detail=False, methods=["get"], url_path="members")
-    def list_members(self, request):
-        team = self.get_queryset().first()
-        if not team:
-            return Response(
-                {"detail": "You do not own a team."}, status=status.HTTP_404_NOT_FOUND
-            )
+    # @action(detail=False, methods=["get"], url_path="members")
+    # def list_members(self, request):
+    #     team = self.get_queryset().first()
+    #     if not team:
+    #         return Response(
+    #             {"detail": "You do not own a team."}, status=status.HTTP_404_NOT_FOUND
+    #         )
 
-        # Segregate members by invite status
-        pending_invites = TeamInvite.objects.filter(team=team, status="PENDING")
-        accepted_members = TeamMember.objects.filter(team=team)
+    #     # Segregate members by invite status
+    #     pending_invites = TeamInvite.objects.filter(team=team, status="PENDING")
+    #     accepted_members = TeamMember.objects.filter(team=team)
 
-        data = {
-            "pending_invites": TeamInviteSerializer(pending_invites, many=True).data,
-            "accepted_members": TeamMemberSerializer(accepted_members, many=True).data,
-        }
-        return Response(data)
+    #     data = {
+    #         "pending_invites": TeamInviteSerializer(pending_invites, many=True).data,
+    #         "accepted_members": TeamMemberSerializer(accepted_members, many=True).data,
+    #     }
+    #     return Response(data)
 
     @swagger_auto_schema(
         operation_description="Invite a new team member",
