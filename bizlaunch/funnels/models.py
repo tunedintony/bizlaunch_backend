@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 from bizlaunch.core.models import CoreModel
 
@@ -11,6 +12,11 @@ class SystemTemplate(CoreModel):
 
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+    image = models.ImageField(null=True, blank=True)
+    # Many-to-many link to FunnelTemplate using a through model
+    funnels = models.ManyToManyField(
+        "FunnelTemplate", through="SystemFunnelAssociation", related_name="systems"
+    )
 
     def __str__(self):
         return self.name
@@ -18,23 +24,35 @@ class SystemTemplate(CoreModel):
 
 class FunnelTemplate(CoreModel):
     """
-    Each system can have multiple funnels. For example, under
-    'VSL Call Engine' you might have:
-    - High Ticket Funnel
-    - Low Ticket Funnel
+    A funnel template is a reusable funnel flow (e.g., VSL Call Engine, Low Ticket Funnel).
+    It can be linked to multiple SystemTemplates.
     """
 
-    system = models.ForeignKey(
-        SystemTemplate, on_delete=models.CASCADE, related_name="funnels"
-    )
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.name}"
+
+
+class SystemFunnelAssociation(CoreModel):
+    """
+    Intermediary model to associate SystemTemplate and FunnelTemplate.
+    This allows a funnel to belong to multiple systems with additional data (like order).
+    """
+
+    system = models.ForeignKey(SystemTemplate, on_delete=models.CASCADE)
+    funnel = models.ForeignKey(FunnelTemplate, on_delete=models.CASCADE)
     order_in_system = models.PositiveIntegerField(
         default=1, help_text="Order in which this funnel appears under the system."
     )
 
+    class Meta:
+        unique_together = ("system", "funnel")
+        ordering = ["order_in_system"]
+
     def __str__(self):
-        return f"{self.system.name} - {self.name}"
+        return f"{self.system.name} - {self.funnel.name}"
 
 
 class PageTemplate(CoreModel):
@@ -57,11 +75,6 @@ class PageTemplate(CoreModel):
     order_in_funnel = models.PositiveIntegerField(
         default=1, help_text="Order in which this page appears within the funnel."
     )
-    components = models.JSONField(
-        default=dict,
-        help_text="JSON structure defining components like headlines, "
-        "subheadings, CTAs, forms, etc.",
-    )
 
     def __str__(self):
         return f"{self.funnel.name} - {self.name}"
@@ -77,19 +90,63 @@ class PageImage(CoreModel):
     page = models.ForeignKey(
         PageTemplate, on_delete=models.CASCADE, related_name="images"
     )
-    image = models.ImageField(upload_to="page_images/")
-    alt_text = models.CharField(
-        max_length=255,
-        blank=True,
-        null=True,
-        help_text="Short description for accessibility.",
+    image_content = models.BinaryField(null=True, blank=True)
+    components = models.JSONField(
+        default=dict,
+        help_text="JSON structure defining components like headlines, "
+        "subheadings, CTAs, forms, etc.",
     )
-    reference_key = models.CharField(
-        max_length=100,
-        blank=True,
-        null=True,
-        help_text="Use this key to reference the image in the components JSON.",
+    order = models.PositiveIntegerField(
+        default=1, help_text="Order in which this image appears in the page."
     )
 
     def __str__(self):
-        return f"Image for {self.page.name} ({self.reference_key or self.id})"
+        return f"Image for {self.page.name}"
+
+
+class Status(models.TextChoices):
+    PENDING = "pending", _("Pending")
+    PROCESSING = "processing", _("Processing")
+    COMPLETED = "completed", _("Completed")
+    FAILED = "failed", _("Failed")
+
+
+class CopyJob(CoreModel):
+    """
+    Stores client data and tracks the status of the ad copy generation process.
+    """
+
+    system = models.ForeignKey(
+        SystemTemplate, on_delete=models.CASCADE, related_name="copy_jobs"
+    )
+    client_data = models.JSONField(help_text="Client input data for copy generation")
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING
+    )
+    file = models.FileField(
+        upload_to="client_files/",
+        null=True,
+        blank=True,
+        help_text="Any supporting file from client",
+    )
+    user_uuid = models.UUIDField(help_text="UUID of user initiating the job")
+
+    def __str__(self):
+        return f"Copy Job {self.pk} - {self.status}"
+
+
+class AdCopy(CoreModel):
+    """
+    Stores the generated ad copy results.
+    """
+
+    job = models.OneToOneField(
+        "CopyJob", on_delete=models.CASCADE, related_name="ad_copy"
+    )
+    copy_text = models.TextField(help_text="Generated ad copy text")
+    copy_json = models.JSONField(
+        default=dict, help_text="Generated ad copy in JSON format"
+    )
+
+    def __str__(self):
+        return f"Ad Copy for Job {self.job.pk}"

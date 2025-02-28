@@ -1,0 +1,38 @@
+[
+{
+    "model": "funnels.systemtemplate",
+    "pk": "08d67f0f-4dc0-4966-a895-3265ad9376f3",
+    "fields": {
+        "created_at": "2025-02-28T20:55:37.480Z",
+        "updated_at": "2025-02-28T20:55:37.481Z",
+        "is_active": true,
+        "name": "VSL CALL ENGINE",
+        "description": "VSL Call Engine is a 2 funnel system that starts with a VSL and then disqualified leads go to a low ticket product",
+        "image": "width_800_1_1.jpg"
+    }
+},
+{
+    "model": "funnels.systemtemplate",
+    "pk": "3bb0d9a3-8702-4702-a79d-e96f3793e72d",
+    "fields": {
+        "created_at": "2025-02-28T14:16:07.387Z",
+        "updated_at": "2025-02-28T14:16:07.387Z",
+        "is_active": true,
+        "name": "Funnel Automation",
+        "description": "Funnel Automation is a 3 funnel system that is made to sell high ticket products, then disqualified leads go to a low ticket product.  The autowebinar is for leads that have not purchased and it will send them back to low ticket funnel.",
+        "image": "width_800_1.jpg"
+    }
+},
+{
+    "model": "funnels.systemtemplate",
+    "pk": "8bcc8756-8ace-4d24-86f2-7c07afa16f1a",
+    "fields": {
+        "created_at": "2025-02-28T20:57:43.087Z",
+        "updated_at": "2025-02-28T20:57:43.087Z",
+        "is_active": true,
+        "name": "Digital Product Launchpad",
+        "description": "Digital Product Launchpad is one funnel to either get booked calls or sell a digital products.",
+        "image": "width_800_2_1.jpg"
+    }
+}
+]
