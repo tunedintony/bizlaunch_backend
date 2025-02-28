@@ -1,7 +1,12 @@
+import os
+
+from django.contrib.auth import get_user_model
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 
 from bizlaunch.core.models import CoreModel
+
+User = get_user_model()
 
 
 class SystemTemplate(CoreModel):
@@ -15,7 +20,9 @@ class SystemTemplate(CoreModel):
     image = models.ImageField(null=True, blank=True)
     # Many-to-many link to FunnelTemplate using a through model
     funnels = models.ManyToManyField(
-        "FunnelTemplate", through="SystemFunnelAssociation", related_name="systems"
+        "FunnelTemplate",
+        through="SystemFunnelAssociation",
+        related_name="systems",
     )
 
     def __str__(self):
@@ -44,7 +51,8 @@ class SystemFunnelAssociation(CoreModel):
     system = models.ForeignKey(SystemTemplate, on_delete=models.CASCADE)
     funnel = models.ForeignKey(FunnelTemplate, on_delete=models.CASCADE)
     order_in_system = models.PositiveIntegerField(
-        default=1, help_text="Order in which this funnel appears under the system."
+        default=1,
+        help_text="Order in which this funnel appears under the system.",
     )
 
     class Meta:
@@ -65,15 +73,19 @@ class PageTemplate(CoreModel):
     """
 
     funnel = models.ForeignKey(
-        FunnelTemplate, on_delete=models.CASCADE, related_name="pages"
+        FunnelTemplate,
+        on_delete=models.CASCADE,
+        related_name="pages",
     )
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True, null=True)
     layout = models.CharField(
-        max_length=50, help_text="e.g., 'optin', 'sales', 'thankyou'"
+        max_length=50,
+        help_text="e.g., 'optin', 'sales', 'thankyou'",
     )
     order_in_funnel = models.PositiveIntegerField(
-        default=1, help_text="Order in which this page appears within the funnel."
+        default=1,
+        help_text="Order in which this page appears within the funnel.",
     )
 
     def __str__(self):
@@ -88,7 +100,9 @@ class PageImage(CoreModel):
     """
 
     page = models.ForeignKey(
-        PageTemplate, on_delete=models.CASCADE, related_name="images"
+        PageTemplate,
+        on_delete=models.CASCADE,
+        related_name="images",
     )
     image_content = models.BinaryField(null=True, blank=True)
     components = models.JSONField(
@@ -97,7 +111,8 @@ class PageImage(CoreModel):
         "subheadings, CTAs, forms, etc.",
     )
     order = models.PositiveIntegerField(
-        default=1, help_text="Order in which this image appears in the page."
+        default=1,
+        help_text="Order in which this image appears in the page.",
     )
 
     def __str__(self):
@@ -111,25 +126,42 @@ class Status(models.TextChoices):
     FAILED = "failed", _("Failed")
 
 
+def copy_job_file_upload_path(instance, filename):
+    """
+    Generate the file upload path for CopyJob files.
+    Path format: user_uuid/copy_jobs/job_uuid/file_name.csv
+    """
+    return os.path.join(f"{instance.user.uuid}/copy_jobs/{instance.pk}/{filename}")
+
+
 class CopyJob(CoreModel):
     """
     Stores client data and tracks the status of the ad copy generation process.
     """
 
     system = models.ForeignKey(
-        SystemTemplate, on_delete=models.CASCADE, related_name="copy_jobs"
+        SystemTemplate,
+        on_delete=models.CASCADE,
+        related_name="copy_jobs",
     )
     client_data = models.JSONField(help_text="Client input data for copy generation")
     status = models.CharField(
-        max_length=20, choices=Status.choices, default=Status.PENDING
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
     )
-    file = models.FileField(
-        upload_to="client_files/",
+    client_file = models.FileField(
+        upload_to=copy_job_file_upload_path,
         null=True,
         blank=True,
         help_text="Any supporting file from client",
     )
-    user_uuid = models.UUIDField(help_text="UUID of user initiating the job")
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="copy_jobs",
+        help_text="User initiating the job",
+    )
 
     def __str__(self):
         return f"Copy Job {self.pk} - {self.status}"
@@ -140,12 +172,17 @@ class AdCopy(CoreModel):
     Stores the generated ad copy results.
     """
 
-    job = models.OneToOneField(
-        "CopyJob", on_delete=models.CASCADE, related_name="ad_copy"
+    copy_job = models.ForeignKey(
+        CopyJob,
+        on_delete=models.CASCADE,
+        related_name="generated_copies",
     )
+    funnel = models.ForeignKey(FunnelTemplate, on_delete=models.CASCADE, null=True)
+    page = models.ForeignKey(PageTemplate, on_delete=models.CASCADE)
     copy_text = models.TextField(help_text="Generated ad copy text")
     copy_json = models.JSONField(
-        default=dict, help_text="Generated ad copy in JSON format"
+        default=dict,
+        help_text="Generated ad copy in JSON format",
     )
 
     def __str__(self):
