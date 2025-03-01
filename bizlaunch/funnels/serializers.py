@@ -41,7 +41,7 @@ class CopyJobStatusSerializer(serializers.ModelSerializer):
     results = AdCopyGenerationSerializer(
         many=True,
         read_only=True,
-        source="ad_copies",
+        source="generated_copies",
         allow_null=True,
     )
 

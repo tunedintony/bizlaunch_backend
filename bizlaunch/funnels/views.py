@@ -13,9 +13,7 @@ from bizlaunch.funnels.serializers import (
     CopyJobStatusSerializer,
     SystemTemplateSerializer,
 )
-
-# from .tasks import process_copy_job
-
+from bizlaunch.funnels.tasks import process_copy_job
 
 class FunnelSystemsAPIView(APIView):
     """
@@ -58,7 +56,7 @@ class CopyJobViewSet(viewsets.ModelViewSet):
         instance = serializer.save()
 
         # Trigger async processing
-        # process_copy_job.delay(instance.uuid)
+        process_copy_job.delay(instance.uuid)
 
         response_serializer = CopyJobStatusSerializer(instance)
         return Response(response_serializer.data, status=status.HTTP_201_CREATED)

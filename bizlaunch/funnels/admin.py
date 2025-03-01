@@ -1,6 +1,8 @@
 from django.contrib import admin
 
 from .models import (
+    AdCopy,
+    CopyJob,
     FunnelTemplate,
     PageImage,
     PageTemplate,
@@ -38,7 +40,23 @@ class PageTemplateAdmin(admin.ModelAdmin):
 
 @admin.register(PageImage)
 class PageImageAdmin(admin.ModelAdmin):
-    list_display = ("page", "order", "image_content")
+    list_display = ("page", "order")
     list_filter = ("page",)
     ordering = ("order",)
     readonly_fields = ("image_content",)
+
+
+@admin.register(CopyJob)
+class CopyJobAdmin(admin.ModelAdmin):
+    list_display = ("system", "status", "user")
+    list_filter = ("status", "system", "user")
+    search_fields = ("system__name", "user__username")
+    readonly_fields = ("client_file",)
+
+
+@admin.register(AdCopy)
+class AdCopyAdmin(admin.ModelAdmin):
+    list_display = ("copy_job", "funnel", "page")
+    list_filter = ("copy_job", "funnel", "page")
+    search_fields = ("copy_job__uuid", "funnel__name", "page__name")
+    readonly_fields = ("copy_text", "copy_json")

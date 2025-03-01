@@ -104,7 +104,7 @@ class PageImage(CoreModel):
         on_delete=models.CASCADE,
         related_name="images",
     )
-    image_content = models.BinaryField(null=True, blank=True)
+    image_content = models.TextField(null=True, blank=True)
     components = models.JSONField(
         default=dict,
         help_text="JSON structure defining components like headlines, "
@@ -122,6 +122,7 @@ class PageImage(CoreModel):
 class Status(models.TextChoices):
     PENDING = "pending", _("Pending")
     PROCESSING = "processing", _("Processing")
+    PARTIALLY_COMPLETED = "partially_completed", _("Partially Completed")
     COMPLETED = "completed", _("Completed")
     FAILED = "failed", _("Failed")
 
