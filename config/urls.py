@@ -20,8 +20,7 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.http import HttpResponse
 from django.shortcuts import render
-from django.urls import include
-from django.urls import path
+from django.urls import include, path
 from django.views import defaults as default_views
 from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
@@ -65,6 +64,7 @@ urlpatterns = [
     ),
     path("redoc/", schema_view.with_ui("redoc", cache_timeout=0), name="schema-redoc"),
     path("api/auth/", include("bizlaunch.users.urls"), name="user-auth"),
+    path("api/copy/", include("bizlaunch.funnels.urls"), name="copy-funnels"),
 ]
 
 
