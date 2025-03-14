@@ -12,13 +12,15 @@ SECRET_KEY = config(
     default="TrI4WY8waCeia4jbpVEIqj1AIUGD2c8xM6hA2MtCqKXCazMsC1CpxKLRhF2EmH0y",
 )
 # https://docs.djangoproject.com/en/dev/ref/settings/#allowed-hosts
-ALLOWED_HOSTS = [
-    "localhost",
-    "0.0.0.0",
-    "127.0.0.1",
-    "172.178.91.96",
-    "cwp-fe.vercel.app",
-]  # noqa: S104
+# ALLOWED_HOSTS = [
+#     "localhost",
+#     "0.0.0.0",
+#     "127.0.0.1",
+#     "172.178.91.96",
+#     "cwp-fe.vercel.app",
+# ]  # noqa:
+
+ALLOWED_HOSTS = config("DJANGO_ALLOWED_HOSTS", default="localhost", cast=Csv())
 
 # CACHES
 # ------------------------------------------------------------------------------
