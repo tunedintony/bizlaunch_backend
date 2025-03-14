@@ -1,14 +1,13 @@
 # # ruff: noqa: E501
 # from .base import *  # noqa: F403
-from .base import DATABASES
+# ruff: noqa: E501
+from .base import *  # noqa: F403
+from .base import DATABASES, INSTALLED_APPS, MIDDLEWARE, config
+
 # from .base import INSTALLED_APPS
 # from .base import REDIS_URL
 # from .base import SPECTACULAR_SETTINGS
 # from .base import config
-
-# ruff: noqa: E501
-from .base import *  # noqa: F403
-from .base import INSTALLED_APPS, MIDDLEWARE, config
 
 
 # # GENERAL
@@ -174,6 +173,7 @@ ALLOWED_HOSTS = [
     "127.0.0.1",
     "172.178.91.96",
     "cwp-fe.vercel.app",
+    "cwpbe-production.up.railway.app",
 ]  # noqa: S104
 
 # CACHES
@@ -214,7 +214,7 @@ INSTALLED_APPS += ["debug_toolbar"]
 MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
 # https://django-debug-toolbar.readthedocs.io/en/latest/configuration.html#debug-toolbar-config
 DEBUG_TOOLBAR_CONFIG = {
-"DISABLE_PANELS": [
+    "DISABLE_PANELS": [
         "debug_toolbar.panels.redirects.RedirectsPanel",
         # Disable profiling panel due to an issue with Python 3.12:
         # https://github.com/jazzband/django-debug-toolbar/issues/1875
