@@ -11,7 +11,7 @@ from .models import (
 )
 
 
-@shared_task
+@shared_task(bind=True)
 def process_copy_job(job_uuid):
     try:
         print(f"Starting processing for CopyJob with UUID: {job_uuid}")
