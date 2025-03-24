@@ -163,6 +163,12 @@ class CopyJob(CoreModel):
         related_name="copy_jobs",
         help_text="User initiating the job",
     )
+    celery_task_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        help_text="Celery task ID for asynchronous processing",
+    )
 
     def __str__(self):
         return f"Copy Job {self.pk} - {self.status}"
@@ -188,3 +194,24 @@ class AdCopy(CoreModel):
 
     def __str__(self):
         return f"Ad Copy for Job {self.job.pk}"
+
+
+class Project(CoreModel):
+    """
+    A project created by a user.
+    When a project is created with a selected system, an associated ad copy job
+    is generated to produce all the ad copies for that system.
+    """
+
+    name = models.CharField(max_length=255, verbose_name=_("Project Name"))
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="projects")
+    copy_job = models.OneToOneField(
+        CopyJob,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="project",
+    )
+
+    def __str__(self):
+        return self.name
