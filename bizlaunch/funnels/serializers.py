@@ -37,7 +37,7 @@ class CopyJobCreateSerializer(serializers.ModelSerializer):
 class AdCopyGenerationSerializer(serializers.ModelSerializer):
     class Meta:
         model = AdCopy
-        fields = ["funnel", "page", "copy_text", "copy_json"]
+        fields = ["funnel", "copy_text", "copy_json"]
 
 
 class CopyJobStatusSerializer(serializers.ModelSerializer):
@@ -144,15 +144,15 @@ class ProjectCreateSerializer(serializers.ModelSerializer):
         # Create the project and link the copy job.
         project = Project.objects.create(user=user, copy_job=copy_job, **validated_data)
 
-        # # Trigger asynchronous processing of the copy job.
-        # from bizlaunch.funnels.tasks import (
-        #     process_copy_job,  # local import to avoid circular dependency
-        # )
+        # Trigger asynchronous processing of the copy job.
+        from bizlaunch.funnels.tasks import (
+            process_copy_job_task,  # local import to avoid circular dependency
+        )
 
-        # task = process_copy_job.delay(copy_job.uuid)
-        # # Save the celery task id on the copy job.
-        # copy_job.celery_task_id = task.id
-        # copy_job.save(update_fields=["celery_task_id"])
+        task = process_copy_job_task.delay(str(project.uuid))
+        # Save the celery task id on the copy job.
+        copy_job.celery_task_id = task.id
+        copy_job.save(update_fields=["celery_task_id"])
 
         return project
 

@@ -1,84 +1,152 @@
-from celery import shared_task
+import logging
 
-from .chains import generate_ad_copy, main  # Your LLM integration function
-from .models import (
+from celery import shared_task
+from django.db import transaction
+from langchain_core.output_parsers import PydanticOutputParser
+
+from bizlaunch.funnels.chains.lcel_chain import create_ad_copy_chain
+from bizlaunch.funnels.chains.models import DFYFunnel
+from bizlaunch.funnels.chains.utils import build_prompt, process_client_csv
+from bizlaunch.funnels.models import (
     AdCopy,
     CopyJob,
-    PageImage,
-    PageTemplate,
+    FunnelTemplate,
+    Project,
     Status,
     SystemFunnelAssociation,
+    SystemTemplate,
 )
 
+logger = logging.getLogger(__name__)
 
-@shared_task(bind=True)
-def process_copy_job(job_uuid):
-    try:
-        print(f"Starting processing for CopyJob with UUID: {job_uuid}")
-        job = CopyJob.objects.get(uuid=job_uuid)
-        print(f"Found CopyJob: {job}")
-        job.status = Status.PROCESSING
-        job.save()
+PARSER_MAP = {
+    "digital_product_launchpad": DFYFunnel,
+}
 
-        # # Get all funnels in the system with their order
-        # system_funnels = (
-        #     SystemFunnelAssociation.objects.filter(system=job.system)
-        #     .select_related("funnel")
-        #     .order_by("order_in_system")
-        # )
-        # print(f"Found {len(system_funnels)} system funnels for system: {job.system}")
 
-        # # Loop through each funnel template in the system
-        # for sf in system_funnels:
-        #     print(f"Processing funnel: {sf.funnel.name}")
-        #     funnel_template = sf.funnel
+def get_funnel_data_for_system(system: SystemTemplate) -> list[dict]:
+    """
+    Gather all data related to the funnels for a given system and return a list of dictionaries.
+    Each dictionary contains funnel-specific data, including pages and their images.
 
-        #     # Get all pages in the funnel template
-        #     pages = funnel_template.pages.order_by("order_in_funnel")
-        #     print(f"Found {len(pages)} pages in funnel: {funnel_template.name}")
+    Args:
+        system (SystemTemplate): The system for which to gather funnel data.
 
-        #     # Loop through each page in the funnel
-        #     for page in pages:
-        #         print(f"Processing page: {page.name}")
+    Returns:
+        list[dict]: A list of dictionaries containing funnel data.
+    """
+    funnel_associations = (
+        SystemFunnelAssociation.objects.filter(system=system)
+        .select_related("funnel")
+        .order_by("order_in_system")
+    )
 
-        #         # Get all images associated with the page
-        #         images = page.images.order_by("order")
-        #         print(f"Found {len(images)} images for page: {page.name}")
+    funnel_data_list = []
 
-        #         # Process each image
-        #         for image in images:
-        #             if not image.image_content:
-        #                 print(f"Skipping image for page {page.name} as it has no content.")
-        #                 continue
+    for association in funnel_associations:
+        funnel = association.funnel
 
-        #             # Send image content and client data to the ad copy function
-        #             print(f"Generating ad copy for image in page: {page.name}")
-        #             result_text = generate_ad_copy(image.image_content, job.client_data)
-        pages = PageImage.objects.all().order_by("order")
-        instructions = "Client is a premium yoga studio targeting working professionals. Use calm, rejuvenating tone."
+        # Build funnel-specific data
+        funnel_data = {
+            "name": funnel.name,
+            "description": funnel.description,
+            "pages": [],
+        }
 
+        # Get pages with prefetched images
+        pages = funnel.pages.prefetch_related("images").all()
         for page in pages:
-            result = generate_ad_copy(instructions, file_content=page.image_content)
-            print(result)
-            # Save the generated text in the AdCopy model
-            AdCopy.objects.create(
-                copy_job=job,
-                page=page.page,  # Use the related PageTemplate instance via reverse lookup
-                copy_text=result,  # Save the text received from the function
+            page_data = {
+                "uuid": str(page.uuid),
+                "name": page.name,
+                "description": page.description,
+                "layout": page.layout,
+                "images": [],
+            }
+
+            for image in page.images.all():
+                page_data["images"].append(
+                    {
+                        "uuid": str(image.uuid),
+                        "image_content": image.image_content,
+                        "components": image.components,
+                        "order": image.order,
+                    }
+                )
+
+            funnel_data["pages"].append(page_data)
+
+        funnel_data_list.append(funnel_data)
+
+    return funnel_data_list
+
+
+@shared_task
+def process_copy_job_task(project_uuid: str):
+    """
+    Task to process a copy job for a given project. This function handles error handling,
+    invokes the chain for ad copy generation, and updates the copy job status.
+
+    Args:
+        project_uuid (str): The UUID of the project to process.
+    """
+    try:
+        with transaction.atomic():
+            project = Project.objects.select_related("copy_job").get(uuid=project_uuid)
+            copy_job = project.copy_job
+
+            copy_job.status = Status.PROCESSING
+            copy_job.save(update_fields=["status"])
+
+            # Process client data
+            if copy_job.client_file:
+                csv_content = copy_job.client_file.read()
+                client_context = process_client_csv(csv_content)
+                copy_job.client_data = client_context.model_dump()
+                copy_job.save(update_fields=["client_data"])
+
+            # Get system and its funnels data
+            system = copy_job.system
+            funnel_data_list = get_funnel_data_for_system(system)
+
+            # Get parser model for the system
+            parser_model = PARSER_MAP.get(
+                system.name.lower().replace(" ", "_"), DFYFunnel
             )
-            print(f"Saved ad copy for image in page: {page.page.name}")
+            parser = PydanticOutputParser(pydantic_object=parser_model)
 
-            # Update job status to partially completed after processing each page
-            job.status = Status.PARTIALLY_COMPLETED
-            job.save()
+            # Process each funnel separately
+            for funnel_data in funnel_data_list:
+                try:
+                    # Create and run chain for this funnel
+                    chain = create_ad_copy_chain(parser)
+                    result = chain.invoke(
+                        {
+                            "funnel_data": funnel_data,
+                            "qa_pairs": copy_job.client_data.get("qa_pairs", []),
+                        }
+                    )
 
-        # Mark the job as completed after processing all funnels
-        job.status = Status.COMPLETED
-        job.save()
-        print(f"CopyJob {job_uuid} completed successfully.")
+                    # Save the generated ad copy
+                    AdCopy.objects.create(
+                        copy_job=copy_job,
+                        funnel=FunnelTemplate.objects.filter(
+                            name=funnel_data["name"]
+                        ).first(),
+                        copy_json=result.model_dump_json(),
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"Error processing funnel {funnel_data['name']}: {str(e)}"
+                    )
+                    continue  # Skip to the next funnel
+
+            # Update copy job status to completed
+            copy_job.status = Status.COMPLETED
+            copy_job.save(update_fields=["status"])
 
     except Exception as e:
-        print(f"Error processing CopyJob {job_uuid}: {str(e)}")
-        job.status = Status.FAILED
-        job.save()
-        raise e
+        logger.error(f"Error processing copy job {project_uuid}: {str(e)}")
+        copy_job.status = Status.FAILED
+        copy_job.save(update_fields=["status"])
+        raise

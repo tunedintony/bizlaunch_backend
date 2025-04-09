@@ -20,7 +20,6 @@ from bizlaunch.funnels.serializers import (
     ProjectSerializer,
     SystemTemplateSerializer,
 )
-from bizlaunch.funnels.tasks import process_copy_job
 
 # Initialize logger
 logger = logging.getLogger(__name__)

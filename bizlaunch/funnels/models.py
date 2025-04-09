@@ -1,3 +1,4 @@
+import base64
 import os
 
 from django.contrib.auth import get_user_model
@@ -104,7 +105,11 @@ class PageImage(CoreModel):
         on_delete=models.CASCADE,
         related_name="images",
     )
-    image_content = models.TextField(null=True, blank=True)
+    image_content = models.TextField(
+        null=True,
+        blank=True,
+        help_text="Base64-encoded string of the image content.",
+    )
     components = models.JSONField(
         default=dict,
         help_text="JSON structure defining components like headlines, "
@@ -114,6 +119,24 @@ class PageImage(CoreModel):
         default=1,
         help_text="Order in which this image appears in the page.",
     )
+
+    def save(self, *args, **kwargs):
+        # Automatically populate `base64_content` if an image is uploaded
+        if hasattr(self, "_temp_image_file"):
+            self.image_content = self.encode_image_to_base64(self._temp_image_file)
+        super().save(*args, **kwargs)
+
+    def encode_image_to_base64(self, image_file):
+        """
+        Encode the uploaded image file to a base64 string.
+        """
+        try:
+            # Read the image file's bytes content
+            image_bytes = image_file.read()
+            # Encode the bytes content to base64
+            return base64.b64encode(image_bytes).decode("utf-8")
+        except Exception as e:
+            return f"Error encoding image to base64: {str(e)}"
 
     def __str__(self):
         return f"Image for {self.page.name}"
@@ -184,8 +207,13 @@ class AdCopy(CoreModel):
         on_delete=models.CASCADE,
         related_name="generated_copies",
     )
-    funnel = models.ForeignKey(FunnelTemplate, on_delete=models.CASCADE, null=True)
-    page = models.ForeignKey(PageTemplate, on_delete=models.CASCADE)
+    funnel = models.ForeignKey(
+        FunnelTemplate,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="generated_copies",
+    )
     copy_text = models.TextField(help_text="Generated ad copy text")
     copy_json = models.JSONField(
         default=dict,
@@ -193,7 +221,7 @@ class AdCopy(CoreModel):
     )
 
     def __str__(self):
-        return f"Ad Copy for Job {self.job.pk}"
+        return f"Ad Copy for Job {self.copy_job.pk}"
 
 
 class Project(CoreModel):
